@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="電費試算">
+<meta name="theme-color" content="#1e3a8a">
+<title>台灣住宅電費試算</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: #f5f7fa; color: #0f172a;
+    padding: 16px; padding-bottom: 40px;
+    max-width: 520px; margin: 0 auto;
+  }
+  h1 { font-size: 20px; font-weight: 700; color: #1e3a8a; text-align: center; margin: 8px 0 4px; }
+  .sub { text-align: center; font-size: 12px; color: #94a3b8; margin-bottom: 18px; }
+  .legend { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: 13px; color: #475569; margin-bottom: 14px; }
+  .dot { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: 0px; margin-right: 5px; }
+  .chart-label { font-size: 12px; color: #94a3b8; margin-bottom: 6px; }
+  #bars { display: flex; align-items: flex-end; justify-content: space-around; height: 220px; gap: 16px; padding: 0 6px; border-bottom: 1px solid #cbd5e1; }
+  .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .bar-val { font-size: 14px; font-weight: 700; margin-bottom: 5px; white-space: nowrap; }
+  .bar { width: 100%; max-width: 110px; border-radius: 6px 6px 0 0; transition: height 0.25s ease; }
+  .xaxis { display: flex; justify-content: space-around; gap: 16px; padding: 8px 6px 0; font-size: 13px; color: #475569; }
+  .xaxis span { flex: 1; text-align: center; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0 22px; }
+  .card { background: #fff; border-radius: 12px; padding: 12px 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .card .label { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+  .card .num { font-size: 18px; font-weight: 700; }
+  .panel { background: #fff; border-radius: 14px; padding: 18px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .row { margin-bottom: 20px; }
+  .row:last-child { margin-bottom: 0; }
+  .row .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .row .lbl { font-size: 15px; color: #334155; }
+  .row .out { font-size: 16px; font-weight: 700; color: #1e3a8a; }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
+    border-radius: 3px; background: #e2e8f0; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 28px; height: 28px;
+    border-radius: 50%; background: #2563eb; cursor: pointer; border: 3px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  }
+  .toggle-row { display: flex; justify-content: space-between; align-items: center; }
+  .switch { position: relative; width: 56px; height: 32px; }
+  .switch input { display: none; }
+  .slider-sw {
+    position: absolute; inset: 0; background: #cbd5e1; border-radius: 32px;
+    transition: 0.2s; cursor: pointer;
+  }
+  .slider-sw::before {
+    content: ""; position: absolute; height: 26px; width: 26px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: 0.2s;
+  }
+  .switch input:checked + .slider-sw { background: #f59e0b; }
+  .switch input:checked + .slider-sw::before { transform: translateX(24px); }
+  input[type=number] { width: 100%; font-size: 18px; font-weight: 700; padding: 11px 12px; border: 1px solid #cbd5e1; border-radius: 8px; text-align: right; color: #1e3a8a; -moz-appearance: textfield; background: #fff; }
+  input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .payback { display: flex; gap: 12px; margin-top: 16px; }
+  .pb-item { flex: 1; background: #eff6ff; border-radius: 10px; padding: 14px 10px; text-align: center; }
+  .pb-label { font-size: 13px; color: #64748b; margin-bottom: 5px; }
+  .pb-num { font-size: 21px; font-weight: 700; }
+  .note { font-size: 12px; color: #94a3b8; text-align: center; margin-top: 18px; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <h1>台灣住宅電費試算</h1>
+  <div class="sub">2026 最新費率 · 累積電價 vs. 時間電價 vs. 儲能</div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#2563eb;"></span>累積電價</span>
+    <span><span class="dot" style="background:#16a34a;"></span>時間電價</span>
+    <span><span class="dot" style="background:#f59e0b;"></span>時間＋儲能</span>
+  </div>
+
+  <div class="chart-label">每月預估電費 (TWD)</div>
+  <div id="bars"></div>
+  <div class="xaxis">
+    <span>時間＋儲能</span><span>時間電價</span><span>累積電價</span>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="label">累積電價</div><div class="num" id="m-cum" style="color:#2563eb;">—</div></div>
+    <div class="card"><div class="label">時間電價</div><div class="num" id="m-tou" style="color:#16a34a;">—</div></div>
+    <div class="card"><div class="label">儲能效益/月</div><div class="num" id="m-save" style="color:#16a34a;">—</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <div class="top"><span class="lbl">每月總用電量 (度)</span><span class="out" id="kwh-out">1100</span></div>
+      <input type="range" id="kwh" min="100" max="2000" step="10" value="1100">
+    </div>
+    <div class="row">
+      <div class="top"><span class="lbl">尖峰用電比例 (%)</span><span class="out" id="peak-out">60</span></div>
+      <input type="range" id="peak" min="10" max="90" step="1" value="60">
+    </div>
+    <div class="row">
+      <div class="top"><span class="lbl">電池每日可用度數 (度)</span><span class="out" id="batt-out">13.5</span></div>
+      <input type="range" id="batt" min="0" max="30" step="0.5" value="13.5">
+    </div>
+    <div class="row toggle-row">
+      <span class="lbl">夏季費率 (6–9月) <span id="season-tag" style="font-size:13px;color:#94a3b8;">夏季</span></span>
+      <label class="switch"><input type="checkbox" id="summer" checked><span class="slider-sw"></span></label>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px;">
+    <div class="row" style="margin-bottom:0;">
+      <div class="top"><span class="lbl">Powerwall 安裝費用 (元)</span></div>
+      <input type="number" id="cost" value="310000" inputmode="numeric" step="10000">
+    </div>
+    <div class="payback">
+      <div class="pb-item"><div class="pb-label">每年可省</div><div class="pb-num" id="pb-year" style="color:#16a34a;">—</div></div>
+      <div class="pb-item"><div class="pb-label">回本年限</div><div class="pb-num" id="pb-years" style="color:#2563eb;">—</div></div>
+    </div>
+  </div>
+
+  <div class="note">
+    累積電價、時間電價（尖峰5.16/離峰2.06）皆為 2026 夏季費率。<br>
+    回本年限以「年省 = 夏季月省×4 + 非夏季月省×8」自動分季加權計算。<br>
+    儲能假設 90% 充放電效率、每日可移轉容量 = 電池度數 × 30 天。
+  </div>
+
+<script>
+  function calcCum(kwh, summer){
+    var t = summer
+      ? [[120,1.78],[210,2.55],[170,3.80],[200,5.14],[300,6.44],[Infinity,8.86]]
+      : [[120,1.78],[210,2.26],[170,3.13],[200,4.24],[300,5.27],[Infinity,7.03]];
+    var rem = kwh, cost = 0;
+    for (var i=0;i<t.length;i++){ if(rem<=0)break; var take=Math.min(rem,t[i][0]); cost+=take*t[i][1]; rem-=take; }
+    return Math.round(cost);
+  }
+  function rates(summer){ return summer ? {p:5.16,o:2.06} : {p:4.93,o:1.99}; }
+  function calcTou(kwh, pr, summer){ var r=rates(summer); return Math.round(75 + kwh*pr*r.p + kwh*(1-pr)*r.o); }
+  function calcBatt(kwh, pr, cap, summer){
+    var r=rates(summer); var pk=kwh*pr, off=kwh*(1-pr);
+    var shift=Math.min(pk, cap*30); var np=pk-shift, no=off+shift/0.9;
+    return Math.round(75 + np*r.p + no*r.o);
+  }
+  var $ = function(id){ return document.getElementById(id); };
+  var COLORS = {batt:'#f59e0b', tou:'#16a34a', cum:'#2563eb'};
+  function fmt(n){ return 'NT$' + n.toLocaleString(); }
+  function render(){
+    var kwh=+$('kwh').value, pr=+$('peak').value/100, cap=+$('batt').value, summer=$('summer').checked;
+    $('kwh-out').textContent = kwh;
+    $('peak-out').textContent = +$('peak').value;
+    $('batt-out').textContent = $('batt').value;
+    $('season-tag').textContent = summer ? '夏季' : '非夏季';
+    var cum=calcCum(kwh,summer), tou=calcTou(kwh,pr,summer), batt=calcBatt(kwh,pr,cap,summer);
+    var save=cum-batt;
+    $('m-cum').textContent = fmt(cum);
+    $('m-tou').textContent = fmt(tou);
+    var sv = $('m-save');
+    sv.textContent = (save>=0?'省 ':'多 ') + 'NT$' + Math.abs(save).toLocaleString();
+    sv.style.color = save>=0 ? '#16a34a' : '#dc2626';
+    var max=Math.max(cum,tou,batt,1);
+    var data=[['batt',batt],['tou',tou],['cum',cum]];
+    $('bars').innerHTML = data.map(function(d){
+      var h=Math.round(d[1]/max*185);
+      return '<div class="bar-wrap"><div class="bar-val" style="color:'+COLORS[d[0]]+'">'+fmt(d[1])
+        +'</div><div class="bar" style="height:'+h+'px;background:'+COLORS[d[0]]+'"></div></div>';
+    }).join('');
+
+    var sumSave = calcCum(kwh,true) - calcBatt(kwh,pr,cap,true);
+    var nonSave = calcCum(kwh,false) - calcBatt(kwh,pr,cap,false);
+    var annual = sumSave*4 + nonSave*8;
+    var py = $('pb-year');
+    py.textContent = (annual>=0?'':'-') + 'NT$' + Math.abs(annual).toLocaleString();
+    py.style.color = annual>=0 ? '#16a34a' : '#dc2626';
+    var cost = +$('cost').value || 0;
+    var pyr = $('pb-years');
+    if (annual > 0) {
+      var yrs = cost / annual;
+      pyr.textContent = yrs.toFixed(1) + ' 年';
+      pyr.style.color = yrs <= 12 ? '#2563eb' : '#dc2626';
+    } else {
+      pyr.textContent = '無法回本';
+      pyr.style.color = '#dc2626';
+    }
+  }
+  ['kwh','peak','batt'].forEach(function(id){ $(id).addEventListener('input', render); });
+  $('summer').addEventListener('change', render);
+  $('cost').addEventListener('input', render);
+  render();
+</script>
+</body>
+</html>
