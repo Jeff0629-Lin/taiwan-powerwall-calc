@@ -103,11 +103,11 @@
       <input type="range" id="kwh" min="100" max="2000" step="10" value="1100">
     </div>
     <div class="row">
-      <div class="top"><span class="lbl">尖峰用電比例 (%)</span><span class="out" id="peak-out">60</span></div>
+      <div class="top"><span class="lbl">尖峰用電比例 (%)</span><input type="number" id="peak-num" class="num-in" value="60" min="0" max="100" inputmode="numeric"></div>
       <input type="range" id="peak" min="0" max="90" step="1" value="60">
     </div>
     <div class="row">
-      <div class="top"><span class="lbl">電池每日可用度數 (度)</span><span class="out" id="batt-out">13.5</span></div>
+      <div class="top"><span class="lbl">電池每日可用度數 (度)</span><input type="number" id="batt-num" class="num-in" value="13.5" min="0" max="100" step="0.5" inputmode="decimal"></div>
       <input type="range" id="batt" min="0" max="30" step="0.5" value="13.5">
     </div>
     <div class="row toggle-row">
@@ -153,9 +153,7 @@
   var COLORS = {batt:'#f59e0b', tou:'#16a34a', cum:'#2563eb'};
   function fmt(n){ return 'NT$' + n.toLocaleString(); }
   function render(){
-    var kwh=+$('kwh-num').value || 0, pr=+$('peak').value/100, cap=+$('batt').value, summer=$('summer').checked;
-    $('peak-out').textContent = +$('peak').value;
-    $('batt-out').textContent = $('batt').value;
+    var kwh=+$('kwh-num').value || 0, pr=(+$('peak-num').value || 0)/100, cap=+$('batt-num').value || 0, summer=$('summer').checked;
     $('season-tag').textContent = summer ? '夏季' : '非夏季';
     var cum=calcCum(kwh,summer), tou=calcTou(kwh,pr,summer), batt=calcBatt(kwh,pr,cap,summer);
     var save=cum-batt;
@@ -189,18 +187,19 @@
       pyr.style.color = '#dc2626';
     }
   }
-  $('kwh').addEventListener('input', function(){
-    $('kwh-num').value = $('kwh').value;
-    render();
-  });
-  $('kwh-num').addEventListener('input', function(){
-    var v = +$('kwh-num').value;
-    if (v >= 100 && v <= 2000) $('kwh').value = v;
-    else if (v > 2000) $('kwh').value = 2000;
-    else if (v >= 0) $('kwh').value = 100;
-    render();
-  });
-  ['peak','batt'].forEach(function(id){ $(id).addEventListener('input', render); });
+  // 滑桿與輸入框雙向連動；輸入框可超出滑桿範圍（滑桿停在邊界，計算仍照實際輸入值）
+  function link(slideId, numId, lo, hi){
+    var s = $(slideId), n = $(numId);
+    s.addEventListener('input', function(){ n.value = s.value; render(); });
+    n.addEventListener('input', function(){
+      var v = parseFloat(n.value);
+      if (!isNaN(v)) s.value = Math.min(Math.max(v, lo), hi);
+      render();
+    });
+  }
+  link('kwh', 'kwh-num', 100, 2000);
+  link('peak', 'peak-num', 0, 90);
+  link('batt', 'batt-num', 0, 30);
   $('summer').addEventListener('change', render);
   $('cost').addEventListener('input', render);
   render();
