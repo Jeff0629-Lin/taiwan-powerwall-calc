@@ -59,7 +59,14 @@
   }
   .switch input:checked + .slider-sw { background: #f59e0b; }
   .switch input:checked + .slider-sw::before { transform: translateX(24px); }
-  input[type=number] { width: 100%; font-size: 18px; font-weight: 700; padding: 11px 12px; border: 1px solid #cbd5e1; border-radius: 8px; text-align: right; color: #1e3a8a; -moz-appearance: textfield; background: #fff; }
+  .num-in {
+    width: 88px; font-size: 16px; font-weight: 700; color: #1e3a8a;
+    padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 8px;
+    text-align: right; background: #fff; -moz-appearance: textfield;
+  }
+  .num-in::-webkit-outer-spin-button, .num-in::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .num-in:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+  #cost { width: 100%; font-size: 18px; font-weight: 700; padding: 11px 12px; border: 1px solid #cbd5e1; border-radius: 8px; text-align: right; color: #1e3a8a; -moz-appearance: textfield; background: #fff; }
   input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .payback { display: flex; gap: 12px; margin-top: 16px; }
   .pb-item { flex: 1; background: #eff6ff; border-radius: 10px; padding: 14px 10px; text-align: center; }
@@ -92,7 +99,7 @@
 
   <div class="panel">
     <div class="row">
-      <div class="top"><span class="lbl">每月總用電量 (度)</span><span class="out" id="kwh-out">1100</span></div>
+      <div class="top"><span class="lbl">每月總用電量 (度)</span><input type="number" id="kwh-num" class="num-in" value="1100" min="0" max="5000" inputmode="numeric"></div>
       <input type="range" id="kwh" min="100" max="2000" step="10" value="1100">
     </div>
     <div class="row">
@@ -146,8 +153,7 @@
   var COLORS = {batt:'#f59e0b', tou:'#16a34a', cum:'#2563eb'};
   function fmt(n){ return 'NT$' + n.toLocaleString(); }
   function render(){
-    var kwh=+$('kwh').value, pr=+$('peak').value/100, cap=+$('batt').value, summer=$('summer').checked;
-    $('kwh-out').textContent = kwh;
+    var kwh=+$('kwh-num').value || 0, pr=+$('peak').value/100, cap=+$('batt').value, summer=$('summer').checked;
     $('peak-out').textContent = +$('peak').value;
     $('batt-out').textContent = $('batt').value;
     $('season-tag').textContent = summer ? '夏季' : '非夏季';
@@ -183,7 +189,18 @@
       pyr.style.color = '#dc2626';
     }
   }
-  ['kwh','peak','batt'].forEach(function(id){ $(id).addEventListener('input', render); });
+  $('kwh').addEventListener('input', function(){
+    $('kwh-num').value = $('kwh').value;
+    render();
+  });
+  $('kwh-num').addEventListener('input', function(){
+    var v = +$('kwh-num').value;
+    if (v >= 100 && v <= 2000) $('kwh').value = v;
+    else if (v > 2000) $('kwh').value = 2000;
+    else if (v >= 0) $('kwh').value = 100;
+    render();
+  });
+  ['peak','batt'].forEach(function(id){ $(id).addEventListener('input', render); });
   $('summer').addEventListener('change', render);
   $('cost').addEventListener('input', render);
   render();
