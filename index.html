@@ -73,6 +73,12 @@
   .pb-label { font-size: 13px; color: #64748b; margin-bottom: 5px; }
   .pb-num { font-size: 21px; font-weight: 700; }
   .note { font-size: 12px; color: #94a3b8; text-align: center; margin-top: 18px; line-height: 1.6; }
+  .seg { display: flex; background: #e2e8f0; border-radius: 10px; padding: 3px; margin-bottom: 14px; }
+  .seg button { flex: 1; border: none; background: transparent; font-size: 14px; color: #475569; padding: 9px 0; border-radius: 8px; font-family: inherit; cursor: pointer; }
+  .seg button.on { background: #fff; color: #1e3a8a; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .derived { background: #f8fafc; border-radius: 10px; padding: 10px 12px; font-size: 13px; color: #475569; line-height: 1.7; margin-top: 4px; }
+  .derived b { color: #1e3a8a; }
 </style>
 </head>
 <body>
@@ -92,24 +98,51 @@
   </div>
 
   <div class="cards">
-    <div class="card"><div class="label">累積電價</div><div class="num" id="m-cum" style="color:#2563eb;">—</div></div>
-    <div class="card"><div class="label">時間電價</div><div class="num" id="m-tou" style="color:#16a34a;">—</div></div>
-    <div class="card"><div class="label">儲能效益/月</div><div class="num" id="m-save" style="color:#16a34a;">—</div></div>
+    <div class="card"><div class="label">改時間電價省</div><div class="num" id="m-tou-save">—</div></div>
+    <div class="card"><div class="label">電池再省</div><div class="num" id="m-batt-save">—</div></div>
+    <div class="card"><div class="label">合計省/月</div><div class="num" id="m-save">—</div></div>
+  </div>
+
+  <div class="seg">
+    <button id="mode-sim" class="on">試算模式</button>
+    <button id="mode-real">實際帳單模式</button>
   </div>
 
   <div class="panel">
-    <div class="row">
-      <div class="top"><span class="lbl">每月總用電量 (度)</span><input type="number" id="kwh-num" class="num-in" value="1100" min="0" max="5000" inputmode="numeric"></div>
-      <input type="range" id="kwh" min="100" max="2000" step="10" value="1100">
+    <div id="panel-sim">
+      <div class="row">
+        <div class="top"><span class="lbl">每月家庭用電量 (度)</span><input type="number" id="kwh-num" class="num-in" value="1100" min="0" max="5000" inputmode="numeric"></div>
+        <input type="range" id="kwh" min="100" max="2000" step="10" value="1100">
+      </div>
+      <div class="row">
+        <div class="top"><span class="lbl">家庭尖峰比例 (裝電池前 %)</span><input type="number" id="peak-num" class="num-in" value="35" min="0" max="100" inputmode="numeric"></div>
+        <input type="range" id="peak" min="0" max="90" step="1" value="35">
+      </div>
+      <div class="row">
+        <div class="top"><span class="lbl">電池每日可用度數 (度)</span><input type="number" id="batt-num" class="num-in" value="13.5" min="0" max="100" step="0.5" inputmode="decimal"></div>
+        <input type="range" id="batt" min="0" max="30" step="0.5" value="13.5">
+      </div>
+      <div class="row">
+        <div class="top"><span class="lbl">每月尖峰放電天數</span><input type="number" id="days" class="num-in" value="22" min="0" max="31" inputmode="numeric"></div>
+        <div class="hint">簡易型二段式僅平日有尖峰，週末全天離峰，約 21–22 天</div>
+      </div>
     </div>
-    <div class="row">
-      <div class="top"><span class="lbl">尖峰用電比例 (%)</span><input type="number" id="peak-num" class="num-in" value="60" min="0" max="100" inputmode="numeric"></div>
-      <input type="range" id="peak" min="0" max="90" step="1" value="60">
+
+    <div id="panel-real" style="display:none;">
+      <div class="row">
+        <div class="top"><span class="lbl">電錶尖峰度數</span><input type="number" id="g-peak" class="num-in" value="33.74" min="0" step="0.01" inputmode="decimal"></div>
+      </div>
+      <div class="row">
+        <div class="top"><span class="lbl">電錶離峰度數</span><input type="number" id="g-off" class="num-in" value="1105.48" min="0" step="0.01" inputmode="decimal"></div>
+        <div class="hint">以上兩項填台電 App「用電資訊 → 每月」的尖峰／離峰</div>
+      </div>
+      <div class="row">
+        <div class="top"><span class="lbl">Powerwall 當月放電 (度)</span><input type="number" id="dis" class="num-in" value="297" min="0" step="1" inputmode="decimal"></div>
+        <div class="hint">填 Tesla App 的「Powerwall 放電量」；不知道就用 每日度數 × 22 天</div>
+      </div>
     </div>
-    <div class="row">
-      <div class="top"><span class="lbl">電池每日可用度數 (度)</span><input type="number" id="batt-num" class="num-in" value="13.5" min="0" max="100" step="0.5" inputmode="decimal"></div>
-      <input type="range" id="batt" min="0" max="30" step="0.5" value="13.5">
-    </div>
+
+    <div class="row"><div class="derived" id="derived"></div></div>
     <div class="row toggle-row">
       <span class="lbl">夏季費率 (6–9月) <span id="season-tag" style="font-size:13px;color:#94a3b8;">夏季</span></span>
       <label class="switch"><input type="checkbox" id="summer" checked><span class="slider-sw"></span></label>
@@ -128,9 +161,9 @@
   </div>
 
   <div class="note">
-    累積電價、時間電價（尖峰5.16/離峰2.06）皆為 2026 夏季費率。<br>
-    回本年限以「年省 = 夏季月省×4 + 非夏季月省×8」自動分季加權計算。<br>
-    儲能假設 90% 充放電效率、每日可移轉容量 = 電池度數 × 30 天。
+    時間電價：夏 尖峰5.16／離峰2.06，非夏 尖峰4.93／離峰1.99（2026 費率）。<br>
+    回本年限只計電池本身效益（時間電價 − 時間＋儲能），<br>年省 = 夏季月省×4 + 非夏季月省×8。<br>
+    儲能假設 90% 充放電效率、離峰由電網充電（未計太陽能）。
   </div>
 
 <script>
@@ -143,36 +176,67 @@
     return Math.round(cost);
   }
   function rates(summer){ return summer ? {p:5.16,o:2.06} : {p:4.93,o:1.99}; }
-  function calcTou(kwh, pr, summer){ var r=rates(summer); return Math.round(75 + kwh*pr*r.p + kwh*(1-pr)*r.o); }
-  function calcBatt(kwh, pr, cap, summer){
-    var r=rates(summer); var pk=kwh*pr, off=kwh*(1-pr);
-    var shift=Math.min(pk, cap*30); var np=pk-shift, no=off+shift/0.9;
-    return Math.round(75 + np*r.p + no*r.o);
-  }
+  function calcTou(peak, off, summer){ var r=rates(summer); return Math.round(75 + peak*r.p + off*r.o); }
+  var EFF = 0.9;
+  var mode = 'sim';
   var $ = function(id){ return document.getElementById(id); };
   var COLORS = {batt:'#f59e0b', tou:'#16a34a', cum:'#2563eb'};
   function fmt(n){ return 'NT$' + n.toLocaleString(); }
+  function pct(a, b){ return b>0 ? (a/b*100).toFixed(1) + '%' : '—'; }
+
+  // 統一換算成「家庭端（裝電池前）」與「電錶端（電池處理後）」兩組尖峰／離峰度數
+  // 電錶尖峰 = 家庭尖峰 − 放電；電錶離峰 = 家庭離峰 + 放電 ÷ 效率（離峰充電損耗）
+  function getFlows(){
+    var f = {};
+    if (mode === 'sim') {
+      var kwh=+$('kwh-num').value || 0, pr=(+$('peak-num').value || 0)/100;
+      var cap=+$('batt-num').value || 0, days=+$('days').value || 0;
+      f.hPeak = kwh*pr; f.hOff = kwh*(1-pr);
+      f.dis = Math.min(f.hPeak, cap*days);
+      f.gPeak = f.hPeak - f.dis; f.gOff = f.hOff + f.dis/EFF;
+    } else {
+      f.gPeak = +$('g-peak').value || 0; f.gOff = +$('g-off').value || 0;
+      f.dis = Math.min(+$('dis').value || 0, f.gOff*EFF);
+      f.hPeak = f.gPeak + f.dis; f.hOff = f.gOff - f.dis/EFF;
+    }
+    return f;
+  }
+  function costs(f, summer){
+    return {
+      cum:  calcCum(f.hPeak + f.hOff, summer),
+      tou:  calcTou(f.hPeak, f.hOff, summer),
+      batt: calcTou(f.gPeak, f.gOff, summer)
+    };
+  }
+  function setSave(id, v){
+    var el=$(id);
+    el.textContent = (v>=0?'省 ':'多 ') + 'NT$' + Math.abs(v).toLocaleString();
+    el.style.color = v>=0 ? '#16a34a' : '#dc2626';
+  }
   function render(){
-    var kwh=+$('kwh-num').value || 0, pr=(+$('peak-num').value || 0)/100, cap=+$('batt-num').value || 0, summer=$('summer').checked;
+    var summer=$('summer').checked;
     $('season-tag').textContent = summer ? '夏季' : '非夏季';
-    var cum=calcCum(kwh,summer), tou=calcTou(kwh,pr,summer), batt=calcBatt(kwh,pr,cap,summer);
-    var save=cum-batt;
-    $('m-cum').textContent = fmt(cum);
-    $('m-tou').textContent = fmt(tou);
-    var sv = $('m-save');
-    sv.textContent = (save>=0?'省 ':'多 ') + 'NT$' + Math.abs(save).toLocaleString();
-    sv.style.color = save>=0 ? '#16a34a' : '#dc2626';
-    var max=Math.max(cum,tou,batt,1);
-    var data=[['batt',batt],['tou',tou],['cum',cum]];
+    var f = getFlows(), c = costs(f, summer);
+    setSave('m-tou-save', c.cum - c.tou);
+    setSave('m-batt-save', c.tou - c.batt);
+    setSave('m-save', c.cum - c.batt);
+    var max=Math.max(c.cum,c.tou,c.batt,1);
+    var data=[['batt',c.batt],['tou',c.tou],['cum',c.cum]];
     $('bars').innerHTML = data.map(function(d){
       var h=Math.round(d[1]/max*185);
       return '<div class="bar-wrap"><div class="bar-val" style="color:'+COLORS[d[0]]+'">'+fmt(d[1])
         +'</div><div class="bar" style="height:'+h+'px;background:'+COLORS[d[0]]+'"></div></div>';
     }).join('');
 
-    var sumSave = calcCum(kwh,true) - calcBatt(kwh,pr,cap,true);
-    var nonSave = calcCum(kwh,false) - calcBatt(kwh,pr,cap,false);
-    var annual = sumSave*4 + nonSave*8;
+    var hTot=f.hPeak+f.hOff, gTot=f.gPeak+f.gOff;
+    $('derived').innerHTML =
+      '家庭端（裝電池前）：尖峰 <b>' + f.hPeak.toFixed(1) + '</b> 度／總 ' + hTot.toFixed(0) + ' 度，尖峰比例 <b>' + pct(f.hPeak,hTot) + '</b><br>' +
+      '電錶端（台電 App）：尖峰 <b>' + f.gPeak.toFixed(1) + '</b> 度／總 ' + gTot.toFixed(0) + ' 度，尖峰比例 <b>' + pct(f.gPeak,gTot) + '</b><br>' +
+      '電池移轉 ' + f.dis.toFixed(0) + ' 度，充放電損耗 ' + (f.dis/EFF - f.dis).toFixed(0) + ' 度';
+
+    // 回本只算電池本身的效益（時間電價 − 時間＋儲能），改時間電價的省錢不用花錢裝電池
+    var cs=costs(f,true), cn=costs(f,false);
+    var annual = (cs.tou-cs.batt)*4 + (cn.tou-cn.batt)*8;
     var py = $('pb-year');
     py.textContent = (annual>=0?'':'-') + 'NT$' + Math.abs(annual).toLocaleString();
     py.style.color = annual>=0 ? '#16a34a' : '#dc2626';
@@ -186,6 +250,14 @@
       pyr.textContent = '無法回本';
       pyr.style.color = '#dc2626';
     }
+  }
+  function setMode(m){
+    mode = m;
+    $('mode-sim').className = m==='sim' ? 'on' : '';
+    $('mode-real').className = m==='real' ? 'on' : '';
+    $('panel-sim').style.display = m==='sim' ? '' : 'none';
+    $('panel-real').style.display = m==='real' ? '' : 'none';
+    render();
   }
   // 滑桿與輸入框雙向連動；輸入框可超出滑桿範圍（滑桿停在邊界，計算仍照實際輸入值）
   function link(slideId, numId, lo, hi){
@@ -202,6 +274,9 @@
   link('batt', 'batt-num', 0, 30);
   $('summer').addEventListener('change', render);
   $('cost').addEventListener('input', render);
+  ['days','g-peak','g-off','dis'].forEach(function(id){ $(id).addEventListener('input', render); });
+  $('mode-sim').addEventListener('click', function(){ setMode('sim'); });
+  $('mode-real').addEventListener('click', function(){ setMode('real'); });
   render();
 </script>
 </body>
