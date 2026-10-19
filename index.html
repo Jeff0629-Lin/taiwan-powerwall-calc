@@ -72,6 +72,7 @@
   .pb-item { flex: 1; background: #eff6ff; border-radius: 10px; padding: 14px 10px; text-align: center; }
   .pb-label { font-size: 13px; color: #64748b; margin-bottom: 5px; }
   .pb-num { font-size: 21px; font-weight: 700; }
+  .hint { font-size: 12px; color: #94a3b8; margin-top: 6px; }
   .derived { background: #f8fafc; border-radius: 10px; padding: 10px 12px; font-size: 13px; color: #475569; line-height: 1.7; }
   .derived b { color: #1e3a8a; }
   .note { font-size: 12px; color: #94a3b8; text-align: center; margin-top: 18px; line-height: 1.6; }
@@ -105,12 +106,17 @@
       <input type="range" id="kwh" min="100" max="2000" step="10" value="1144">
     </div>
     <div class="row">
-      <div class="top"><span class="lbl"><span class="dot" style="background:#16a34a;"></span>時間電價 尖峰比例 (%)</span><input type="number" id="peak-num" class="num-in" value="30" min="0" max="100" step="0.1" inputmode="decimal"></div>
-      <input type="range" id="peak" min="0" max="90" step="0.5" value="30">
+      <div class="top"><span class="lbl"><span class="dot" style="background:#f59e0b;"></span>時間＋儲能 尖峰比例 (%)</span><input type="number" id="bpeak-num" class="num-in" value="2.9" min="0" max="100" step="0.1" inputmode="decimal"></div>
+      <input type="range" id="bpeak" min="0" max="90" step="0.1" value="2.9">
+      <div class="hint">拉到與台電帳單金額相符</div>
     </div>
     <div class="row">
-      <div class="top"><span class="lbl"><span class="dot" style="background:#f59e0b;"></span>時間＋儲能 尖峰比例 (%)</span><input type="number" id="bpeak-num" class="num-in" value="3" min="0" max="100" step="0.1" inputmode="decimal"></div>
-      <input type="range" id="bpeak" min="0" max="90" step="0.5" value="3">
+      <div class="top"><span class="lbl">電池每日可用度數 (度)</span><input type="number" id="batt-num" class="num-in" value="13.5" min="0" max="100" step="0.5" inputmode="decimal"></div>
+      <input type="range" id="batt" min="0" max="30" step="0.5" value="13.5">
+    </div>
+    <div class="row">
+      <div class="top"><span class="lbl">每月尖峰放電天數</span><input type="number" id="days" class="num-in" value="22" min="0" max="31" inputmode="numeric"></div>
+      <div class="hint">二段式只有平日有尖峰，約 21–22 天；有 Tesla App 當月放電量時，可用「放電量 ÷ 每日度數」換算</div>
     </div>
     <div class="row">
       <div class="derived" id="diff"></div>
@@ -133,7 +139,7 @@
   </div>
 
   <div class="note">
-    兩個尖峰比例各自拉到與台電帳單金額相符，比例差即為 Powerwall 移走的尖峰用電。<br>
+    時間＋儲能尖峰比例拉到與帳單相符，程式再加回電池移轉量，還原「只申請時間電價」的費用。<br>
     時間電價：夏 尖峰5.16／離峰2.06，非夏 尖峰4.93／離峰1.99（2026 費率）。<br>
     儲能效益 = 時間電價 − 時間＋儲能；年省 = 夏季月省×4 + 非夏季月省×8。
   </div>
@@ -149,14 +155,21 @@
   }
   function rates(summer){ return summer ? {p:5.16,o:2.06} : {p:4.93,o:1.99}; }
   function calcTou(kwh, pr, summer){ var r=rates(summer); return Math.round(75 + kwh*pr*r.p + kwh*(1-pr)*r.o); }
+  var EFF = 0.9;
   var $ = function(id){ return document.getElementById(id); };
   var COLORS = {batt:'#f59e0b', tou:'#16a34a', cum:'#2563eb'};
   function fmt(n){ return 'NT$' + n.toLocaleString(); }
   function render(){
-    var kwh=+$('kwh-num').value || 0, pr=(+$('peak-num').value || 0)/100, bpr=(+$('bpeak-num').value || 0)/100, summer=$('summer').checked;
+    var kwh=+$('kwh-num').value || 0, bpr=(+$('bpeak-num').value || 0)/100, summer=$('summer').checked;
+    var cap=+$('batt-num').value || 0, days=+$('days').value || 0;
     $('season-tag').textContent = summer ? '夏季' : '非夏季';
-    // 兩種方案都用台電 App 的總度數，各自用自己的尖峰比例計價
-    var cum=calcCum(kwh,summer), tou=calcTou(kwh,pr,summer), batt=calcTou(kwh,bpr,summer);
+    // 電錶端（台電 App）→ 還原成沒有電池時的家庭用電：
+    // 家庭尖峰 = 電錶尖峰 + 放電；家庭離峰 = 電錶離峰 − 放電 ÷ 效率（離峰充電時多買的損耗）
+    var gPeak=kwh*bpr, gOff=kwh*(1-bpr);
+    var dis=Math.min(cap*days, gOff*EFF);
+    var hPeak=gPeak+dis, hOff=gOff-dis/EFF, hTot=hPeak+hOff;
+    var pr = hTot>0 ? hPeak/hTot : 0;
+    var cum=calcCum(hTot,summer), tou=calcTou(hTot,pr,summer), batt=calcTou(kwh,bpr,summer);
     var save=tou-batt;
     $('m-cum').textContent = fmt(cum);
     $('m-tou').textContent = fmt(tou);
@@ -171,12 +184,12 @@
         +'</div><div class="bar" style="height:'+h+'px;background:'+COLORS[d[0]]+'"></div></div>';
     }).join('');
 
-    var shifted = kwh*(pr-bpr);
-    $('diff').innerHTML = '尖峰比例：時間電價 <b>' + (pr*100).toFixed(1) + '%</b> → 時間＋儲能 <b>' + (bpr*100).toFixed(1) + '%</b><br>'
-      + '相差 <b>' + ((pr-bpr)*100).toFixed(1) + '%</b>，約 <b>' + Math.round(shifted) + ' 度</b>尖峰用電被 Powerwall 移到離峰';
+    $('diff').innerHTML = '🔋 Powerwall 每月移轉 <b>' + Math.round(dis) + ' 度</b>（' + cap + ' 度 × ' + days + ' 天），充放電損耗 ' + Math.round(dis/EFF-dis) + ' 度<br>'
+      + '沒有電池時：家庭用電 ' + Math.round(hTot) + ' 度，尖峰 ' + Math.round(hPeak) + ' 度，<span style="color:#16a34a">時間電價尖峰比例 <b>' + (pr*100).toFixed(1) + '%</b></span><br>'
+      + '裝電池後：電錶 ' + Math.round(kwh) + ' 度，尖峰 ' + Math.round(gPeak) + ' 度，<span style="color:#f59e0b">尖峰比例 <b>' + (bpr*100).toFixed(1) + '%</b></span>';
 
-    var sumSave = calcTou(kwh,pr,true) - calcTou(kwh,bpr,true);
-    var nonSave = calcTou(kwh,pr,false) - calcTou(kwh,bpr,false);
+    var sumSave = calcTou(hTot,pr,true) - calcTou(kwh,bpr,true);
+    var nonSave = calcTou(hTot,pr,false) - calcTou(kwh,bpr,false);
     var annual = sumSave*4 + nonSave*8;
     var py = $('pb-year');
     py.textContent = (annual>=0?'':'-') + 'NT$' + Math.abs(annual).toLocaleString();
@@ -203,7 +216,8 @@
     });
   }
   link('kwh', 'kwh-num', 100, 2000);
-  link('peak', 'peak-num', 0, 90);
+  link('batt', 'batt-num', 0, 30);
+  $('days').addEventListener('input', render);
   link('bpeak', 'bpeak-num', 0, 90);
   $('summer').addEventListener('change', render);
   $('cost').addEventListener('input', render);
