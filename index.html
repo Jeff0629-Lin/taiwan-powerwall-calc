@@ -23,7 +23,8 @@
   .chart-label { font-size: 12px; color: #94a3b8; margin-bottom: 6px; }
   #bars { display: flex; align-items: flex-end; justify-content: space-around; height: 220px; gap: 16px; padding: 0 6px; border-bottom: 1px solid #cbd5e1; }
   .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
-  .bar-val { font-size: 14px; font-weight: 700; margin-bottom: 5px; white-space: nowrap; }
+  .bar-val { font-size: 14px; font-weight: 700; margin-bottom: 5px; white-space: nowrap; text-align: center; }
+  .bar-unit { display: block; font-size: 11px; font-weight: 500; color: #64748b; margin-top: 1px; }
   .bar { width: 100%; max-width: 110px; border-radius: 6px 6px 0 0; transition: height 0.25s ease; }
   .xaxis { display: flex; justify-content: space-around; gap: 16px; padding: 8px 6px 0; font-size: 13px; color: #475569; }
   .xaxis span { flex: 1; text-align: center; }
@@ -92,7 +93,7 @@
     <span><span class="dot" style="background:#f59e0b;"></span>時間＋儲能</span>
   </div>
 
-  <div class="chart-label">每月預估電費 (TWD)</div>
+  <div class="chart-label">每月預估電費 (TWD)・平均每度電價 = 電費 ÷ 家庭實際用電</div>
   <div id="bars"></div>
   <div class="xaxis">
     <span>時間＋儲能</span><span>時間電價</span><span>累積電價</span>
@@ -202,10 +203,12 @@
     sv.style.color = save>=0 ? '#16a34a' : '#dc2626';
     var max=Math.max(cum,tou,batt,1);
     var data=[['batt',batt],['tou',tou],['cum',cum]];
+    // 平均每度電價：三種方案都除以「家庭實際用電」，用電量不同的家庭也能比較
     $('bars').innerHTML = data.map(function(d){
-      var h=Math.round(d[1]/max*185);
+      var h=Math.round(d[1]/max*165);
+      var unit = hTot>0 ? (d[1]/hTot).toFixed(2) : '—';
       return '<div class="bar-wrap"><div class="bar-val" style="color:'+COLORS[d[0]]+'">'+fmt(d[1])
-        +'</div><div class="bar" style="height:'+h+'px;background:'+COLORS[d[0]]+'"></div></div>';
+        +'<span class="bar-unit">每度 '+unit+' 元</span></div><div class="bar" style="height:'+h+'px;background:'+COLORS[d[0]]+'"></div></div>';
     }).join('');
 
     var msg = '<span style="color:#16a34a">時間電價：尖峰 ' + Math.round(hPeak) + ' 度／家庭用電 ' + Math.round(hTot) + ' 度（' + (pr*100).toFixed(1) + '%）</span><br>'
