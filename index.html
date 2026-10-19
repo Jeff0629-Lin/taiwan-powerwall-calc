@@ -72,6 +72,8 @@
   .pb-item { flex: 1; background: #eff6ff; border-radius: 10px; padding: 14px 10px; text-align: center; }
   .pb-label { font-size: 13px; color: #64748b; margin-bottom: 5px; }
   .pb-num { font-size: 21px; font-weight: 700; }
+  .pb-base { font-size: 12px; color: #64748b; text-align: center; margin-top: 10px; }
+  .pb-alt { font-size: 13px; color: #64748b; text-align: center; margin-top: 6px; padding-top: 10px; border-top: 1px dashed #cbd5e1; }
   .hint { font-size: 12px; color: #94a3b8; margin-top: 6px; }
   .link-btn { border: none; background: none; color: #2563eb; font-size: 12px; text-decoration: underline; padding: 0; font-family: inherit; cursor: pointer; }
   .warn { color: #dc2626; }
@@ -143,12 +145,14 @@
       <div class="pb-item"><div class="pb-label">每年可省</div><div class="pb-num" id="pb-year" style="color:#16a34a;">—</div></div>
       <div class="pb-item"><div class="pb-label">回本年限</div><div class="pb-num" id="pb-years" style="color:#2563eb;">—</div></div>
     </div>
+    <div class="pb-base" id="pb-base"></div>
+    <div class="pb-alt" id="pb-alt"></div>
   </div>
 
   <div class="note">
     兩個尖峰比例的差 = Powerwall 移轉量；損耗 = 移轉量 × 11%（90% 充放電效率）。<br>
     時間電價：夏 尖峰5.16／離峰2.06，非夏 尖峰4.93／離峰1.99（2026 費率）。<br>
-    儲能效益 = 時間電價 − 時間＋儲能；年省 = 夏季月省×4 + 非夏季月省×8。
+    儲能效益 = min(累積, 時間電價) − 時間＋儲能；年省 = 夏季月省×4 + 非夏季月省×8。
   </div>
 
 <script>
@@ -189,7 +193,8 @@
     var loss=dis*LOSS, hTot=kwh-loss, hPeak=pr*hTot;
     var cum=calcCum(hTot,summer), tou=calcTou(hTot,pr,summer), batt=calcTou(kwh,bpr,summer);
     var maxDis=cap*days;
-    var save=tou-batt;
+    // 儲能效益的比較基準 = 不花錢就能選的最便宜方案（累積、時間電價取低者）
+    var save=Math.min(cum,tou)-batt;
     $('m-cum').textContent = fmt(cum);
     $('m-tou').textContent = fmt(tou);
     var sv = $('m-save');
@@ -211,9 +216,14 @@
     else if (dis > maxDis + 0.5) msg += '<br><span class="warn">⚠️ 移轉量超過電池能力上限，請調低時間電價尖峰比例或確認容量／天數</span>';
     $('diff').innerHTML = msg;
 
-    var sumSave = calcTou(hTot,pr,true) - calcTou(kwh,bpr,true);
-    var nonSave = calcTou(hTot,pr,false) - calcTou(kwh,bpr,false);
-    var annual = sumSave*4 + nonSave*8;
+    // 分季計算：基準 = min(累積, 時間電價)；另算「跟累積電價比」供參考
+    function seasonSave(sm){
+      var c=calcCum(hTot,sm), t=calcTou(hTot,pr,sm), bt=calcTou(kwh,bpr,sm);
+      return { base: Math.min(c,t)-bt, cum: c-bt, touCheaper: t<=c };
+    }
+    var ss=seasonSave(true), sn=seasonSave(false);
+    var annual = ss.base*4 + sn.base*8;
+    var annualCum = ss.cum*4 + sn.cum*8;
     var py = $('pb-year');
     py.textContent = (annual>=0?'':'-') + 'NT$' + Math.abs(annual).toLocaleString();
     py.style.color = annual>=0 ? '#16a34a' : '#dc2626';
@@ -227,6 +237,13 @@
       pyr.textContent = '無法回本';
       pyr.style.color = '#dc2626';
     }
+    var baseName = (ss.touCheaper && sn.touCheaper) ? '時間電價' : (!ss.touCheaper && !sn.touCheaper) ? '累積電價' : '累積／時間電價（依季節取低者）';
+    $('pb-base').textContent = '比較基準：' + baseName + '（不裝電池時較便宜的方案）';
+    // 基準本來就是累積電價時，第二行與上面相同，不重複顯示
+    $('pb-alt').style.display = baseName==='累積電價' ? 'none' : '';
+    $('pb-alt').innerHTML = '若跟累積電價比：每年省 ' + (annualCum<0?'-':'') + 'NT$' + Math.abs(annualCum).toLocaleString() + '，回本 '
+      + (annualCum>0 ? '<b>' + (cost/annualCum).toFixed(1) + ' 年</b>' : '<b>無法回本</b>')
+      + '<br><span style="font-size:11px;color:#94a3b8">含改時間電價的省錢，不需裝電池也拿得到</span>';
   }
   // 滑桿與輸入框雙向連動；輸入框可超出滑桿範圍（滑桿停在邊界，計算仍照實際輸入值）
   function link(slideId, numId, lo, hi){
